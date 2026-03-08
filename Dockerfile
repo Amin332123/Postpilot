@@ -18,13 +18,14 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     curl \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd intl pdo pdo_pgsql pgsql bcmath zip opcache
+    && docker-php-ext-install -j$(nproc) gd intl pdo pdo_pgsql pgsql bcmath zip opcache \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
 # Set Apache to use Laravel's public/ folder
-RUN sed -i 's#/var/www/html#/var/www/html/public#g' /etc/apache2/sites-available/000-default.conf
+RUN sed -i 's#/var/www/html#/var/www/html/PostPilot/public#g' /etc/apache2/sites-available/000-default.conf
 
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
@@ -33,10 +34,11 @@ COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 COPY . .
 
 # Install PHP dependencies via Composer
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --working-dir=/var/www/html/PostPilot
 
-# Set permissions for storage and bootstrap/cache
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+# Create and set permissions for storage and bootstrap/cache
+RUN mkdir -p /var/www/html/PostPilot/storage /var/www/html/PostPilot/bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html/PostPilot/storage /var/www/html/PostPilot/bootstrap/cache
 
 # Expose port 80
 EXPOSE 80
