@@ -2,7 +2,7 @@
 FROM php:8.4-apache
 
 # Set working directory
-WORKDIR /var/www/html
+WORKDIR /var/www/html/PostPilot
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y \
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
+
+# Set Apache to use Laravel's public/ folder
+RUN sed -i 's#/var/www/html#/var/www/html/public#g' /etc/apache2/sites-available/000-default.conf
 
 # Install Composer
 COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
