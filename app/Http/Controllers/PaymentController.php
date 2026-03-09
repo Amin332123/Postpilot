@@ -61,7 +61,7 @@ class PaymentController extends Controller
 
         $product = $data['data']['items'][0]['product']['name'] ?? null;
 
-        if ($product === 'Pilot') {
+        if ($product == 'Pilot') {
 
             $subscription->update([
                 'plan' => 'Pilot',
@@ -74,8 +74,7 @@ class PaymentController extends Controller
             ]);
 
         }
-
-        if ($product === 'Captain') {
+        if ($product == 'Captain') {
 
             $subscription->update([
                 'plan' => 'Captain',
