@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
             'paddle/webhook', // This matches your route URL
+            'api/paddle/webhook'
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
