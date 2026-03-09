@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Subscription;
 use App\Models\User;
-
+use Illuminate\Support\Facades\Log;
 class PaymentController extends Controller
 {
 
@@ -36,60 +36,50 @@ class PaymentController extends Controller
 
 
 
+   
+
     public function webhook(Request $request)
     {
-
         $data = $request->all();
 
-        if (!isset($data['data']['customer']['email'])) {
-            return response()->json(['error' => 'email missing'], 400);
-        }
+        // 1. Log the data so you can see it in Render Logs if it fails
+        Log::info('Paddle Webhook Data:', $data);
 
-        $email = $data['data']['customer']['email'];
+        // 2. Find the email (Paddle v2 nests this inside the 'customer' or 'details')
+        $email = $data['data']['customer']['email']
+            ?? $data['data']['details']['customer']['email']
+            ?? null;
+
+        if (!$email) {
+            Log::error('Webhook Error: No email found in payload');
+            return response()->json(['error' => 'Email missing'], 400);
+        }
 
         $user = User::where('email', $email)->first();
 
         if (!$user) {
-            return response()->json(['error' => 'user not found'], 404);
+            Log::error("Webhook Error: User not found for email: $email");
+            return response()->json(['error' => 'User not found'], 404);
         }
 
+        // 3. Update the Plan
+        $productName = $data['data']['items'][0]['product']['name'] ?? 'Unknown';
         $subscription = $user->subscription;
 
-        if (!$subscription) {
-            return response()->json(['error' => 'subscription missing'], 404);
-        }
-
-        $product = $data['data']['items'][0]['product']['name'] ?? null;
-
-        if ($product == 'Pilot') {
-
+        if ($subscription) {
             $subscription->update([
-                'plan' => 'Pilot',
-                'monthly_limit' => 600,
-                'used_this_month' => 0,
-                'price' => 5.99,
+                'plan' => $productName,
+                'status' => 'active',
+                'monthly_limit' => ($productName == 'Captain') ? 0 : 600,
+                'price' => ($productName == 'Captain') ? 19.99 : 5.99,
                 'starts_at' => now(),
                 'ends_at' => now()->addMonth(),
-                'status' => 'active'
             ]);
 
-        }
-        if ($product == 'Captain') {
-
-            $subscription->update([
-                'plan' => 'Captain',
-                'monthly_limit' => null,
-                'used_this_month' => 0,
-                'price' => 19.99,
-                'starts_at' => now(),
-                'ends_at' => now()->addMonth(),
-                'status' => 'active'
-            ]);
-
+            Log::info("Success: Updated $email to $productName");
         }
 
         return response()->json(['success' => true]);
-
     }
 
 }
