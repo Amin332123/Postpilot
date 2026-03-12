@@ -253,7 +253,6 @@
     </div>
 
     <script>
-        // Sidebar Controls
         const sidebar = document.getElementById('sidebar');
         const overlay = document.getElementById('sidebarOverlay');
         const openBtn = document.getElementById('openMobileMenu');
@@ -268,69 +267,115 @@
         closeBtn.onclick = toggleMenu;
         overlay.onclick = toggleMenu;
 
-        // Toast Notification
-        const toastEl = document.createElement('div');
-        toastEl.className = 'fixed bottom-6 right-6 z-[100] px-5 py-3 rounded-2xl text-sm font-medium text-white shadow-2xl';
+         const toastEl = document.createElement('div');
+        toastEl.className = 'fixed bottom-6 right-6 z-50 px-5 py-3 rounded-2xl text-sm font-medium text-white';
         toastEl.style.background = 'linear-gradient(135deg,#7D5FFF,#FF5FA3)';
+        toastEl.style.boxShadow = '0 8px 32px rgba(125,95,255,.4)';
         toastEl.style.display = 'none';
         document.body.appendChild(toastEl);
 
-        function toast(msg) {
+        function toast(msg, duration = 2500) {
             toastEl.textContent = msg;
             toastEl.style.display = 'block';
-            setTimeout(() => { toastEl.style.display = 'none'; }, 2500);
+            setTimeout(() => { toastEl.style.display = 'none'; }, duration);
         }
 
-        // Form Logic
         document.getElementById("captionForm").addEventListener("submit", async function (e) {
             e.preventDefault();
+
+            const description = document.getElementById("productDesc").value;
+            const tone = document.getElementById("tone").value;
+            const language = document.getElementById("language").value;
+            const hashtags = document.getElementById("hashtags").value;
+
             document.getElementById("outputSection").classList.remove("hidden");
             document.getElementById("generatedContent").classList.add("hidden");
             document.getElementById("loadingSkeleton").classList.remove("hidden");
-            toast("Generating... 🤖");
+
+            toast("Generating caption... 🤖");
 
             try {
+
                 const response = await fetch("/generate-caption", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                         "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute("content")
                     },
-                    body: JSON.stringify({
-                        description: document.getElementById("productDesc").value,
-                        tone: document.getElementById("tone").value,
-                        language: document.getElementById("language").value,
-                        hashtags: document.getElementById("hashtags").value
-                    })
+                    body: JSON.stringify({ description, tone, language, hashtags })
                 });
 
                 const data = await response.json();
-                if (!response.ok) throw new Error(data.error || "Error");
+
+                /* 🔴 PLAN LIMIT CHECK */
+                if (!response.ok) {
+
+                    if (data.plan === "Free" || data.plan === "Pilot") {
+                        toast("🚫 Limit reached. Redirecting to upgrade...");
+
+                        setTimeout(() => {
+                            window.location.href = "/upgrade";
+                        }, 1200);
+
+                        return;
+                    }
+
+                    throw new Error(data.error || "Unknown error");
+                }
+
+                /* SUCCESS */
 
                 document.querySelector("#captionOutput p").textContent = data.caption;
+
                 if (data.hashtags) {
-                    document.querySelector("#hashtagsOutput p:last-child").textContent = data.hashtags;
+                    const hashtagsBox = document.querySelector("#hashtagsOutput p:last-child");
+                    hashtagsBox.textContent = data.hashtags;
                     document.getElementById("hashtagsOutput").classList.remove("hidden");
+                } else {
+                    document.getElementById("hashtagsOutput").classList.add("hidden");
                 }
-                
+
                 document.getElementById("loadingSkeleton").classList.add("hidden");
                 document.getElementById("generatedContent").classList.remove("hidden");
-                toast("Success! ✅");
-            } catch (err) {
-                toast("❌ " + err.message);
+                if (data.used !== undefined && data.limit !== undefined) {
+                    const usedEl = document.getElementById("usedText");
+                    const barEl = document.getElementById("usedBar");
+                    const planEl = document.getElementById("planName");
+
+                    usedEl.textContent = `${data.used} / ${data.limit}`;
+                    barEl.style.width = `${data.percentage}%`;
+                    planEl.textContent = data.plan;
+                }
+                toast("Caption generated ✅");
+
+            } catch (error) {
+
+                console.error("FULL ERROR:", error);
+
+                toast("❌ " + error.message);
+
                 document.getElementById("loadingSkeleton").classList.add("hidden");
             }
         });
 
+
         function copyText() {
-            navigator.clipboard.writeText(document.querySelector("#captionOutput p").textContent);
-            toast("📋 Copied!");
+            const text = document.querySelector("#captionOutput p").textContent;
+            navigator.clipboard.writeText(text);
+            toast("📋 Caption copied!");
         }
+
+        function copyHashtags() {
+            const text = document.querySelector("#hashtagsOutput p:last-child").textContent;
+            navigator.clipboard.writeText(text);
+            toast("#️⃣ Hashtags copied!");
+        }
+
         function copyAll() {
-            const cap = document.querySelector("#captionOutput p").textContent;
-            const hash = document.querySelector("#hashtagsOutput p:last-child").textContent;
-            navigator.clipboard.writeText(cap + "\n\n" + hash);
-            toast("📄 All Copied!");
+            const caption = document.querySelector("#captionOutput p").textContent;
+            const hashtags = document.querySelector("#hashtagsOutput p:last-child").textContent;
+            navigator.clipboard.writeText(caption + "\n\n" + hashtags);
+            toast("📄 Everything copied!");
         }
     </script>
 </body>
